@@ -4,7 +4,29 @@ UIKembali Mobile adalah aplikasi mobile berbasis **Flutter** yang menjadi pendam
 
 Aplikasi mobile dirancang untuk terintegrasi dengan web service Django dari proyek web UIKembali, sehingga data yang digunakan pada aplikasi mobile terhubung dengan data pada aplikasi web.
 
-> **Status repository:** Repository ini disiapkan untuk pengembangan aplikasi Flutter. Karena codebase mobile belum tersedia pada saat README ini disusun, informasi struktur folder, dependency, cara menjalankan aplikasi, dan tautan APK belum dicantumkan. Bagian tersebut dapat ditambahkan setelah implementasinya tersedia.
+> **Status (Checkpoint 1):** kerangka aplikasi Flutter, navigasi 5 tab, dan modul **Katalog** (Beranda, Jelajahi & filter, detail barang, Riwayat transaksi) sudah terhubung ke endpoint Django REST Framework. Tab Forum dan Profil masih berupa halaman placeholder milik anggota lain. Tautan APK menyusul setelah Checkpoint 1.
+
+## Menjalankan Aplikasi
+
+Prasyarat: Flutter 3.50 atau lebih baru.
+
+```bash
+flutter pub get
+flutter run                                   # memakai web service PWS
+flutter run --dart-define=API_BASE_URL=http://10.0.2.2:8000   # server Django lokal (emulator Android)
+flutter test
+```
+
+Struktur kode utama:
+
+```text
+lib/
+├── main.dart, theme.dart, config.dart   # entry point, token desain (font Inter), alamat API
+├── models/                              # Item, Transaction, CatalogFilter
+├── services/katalog_api.dart            # pemanggilan HTTP ke Django REST Framework
+├── screens/                             # home_page, katalog/, transactions/, home_shell (bottom nav)
+└── widgets/item_card.dart               # kartu barang yang dipakai ulang
+```
 
 ## Repository Proyek
 
@@ -91,23 +113,28 @@ Aplikasi mobile Flutter menggunakan web service dari aplikasi web UIKembali yang
 5. Aplikasi Flutter mengolah response JSON menjadi objek/model Dart.
 6. Data yang telah diolah ditampilkan pada widget Flutter. Ketika pengguna melakukan aksi yang mengubah data, aplikasi mengirim request ke endpoint backend yang sesuai dan memperbarui tampilan berdasarkan response dari server.
 
-### Endpoint JSON yang telah terdokumentasi
+### Endpoint Django REST Framework (modul Katalog)
 
-Berdasarkan dokumentasi repository web UIKembali, endpoint JSON katalog yang tersedia adalah:
+Endpoint berikut dibangun dengan Django REST Framework pada repository web UIKembali (branch `feat/katalog-drf`, prefix `/api/v1/`). Respons daftar memakai amplop `{count, page, num_pages, results}`.
 
-| Method | Endpoint | Kegunaan |
-|---|---|---|
-| `GET` | `/katalog/json/` | Mengambil data daftar barang dalam format JSON. |
-| `GET` | `/katalog/<id>/json/` | Mengambil detail barang berdasarkan ID dalam format JSON. |
+| Method | Endpoint | Kegunaan | Akses |
+|---|---|---|---|
+| `GET` | `/api/v1/items/` | Daftar barang. Filter: `q`, `category`, `type` (`ADOPSI`/`JUAL`), `condition`, `location`, `sort`, `min_price`, `max_price`, `page`. | Semua pengunjung |
+| `POST` | `/api/v1/items/` | Memasang barang (JSON atau `multipart` bila ada foto). | Pengguna login |
+| `GET` | `/api/v1/items/mine/` | Barang milik pengguna. | Pengguna login |
+| `GET` | `/api/v1/items/<uuid>/` | Detail barang. | Semua pengunjung |
+| `PUT`/`PATCH`/`DELETE` | `/api/v1/items/<uuid>/` | Ubah / hapus (soft delete) barang. | Pemilik barang |
+| `POST` | `/api/v1/items/<uuid>/ajukan/` | Mengajukan adopsi/pembelian. | Pengguna login, bukan pemilik |
+| `GET` | `/api/v1/transactions/` | Riwayat transaksi (sebagai peminta atau pemilik). Filter: `type`, `page`. | Pengguna login |
 
-Contoh penggunaan endpoint dengan alamat PWS:
+Pengunjung yang belum login tidak menerima field `contact`, dan koordinat dibulatkan sekitar 100 m. Autentikasi memakai session Django (`SessionAuthentication`); halaman yang membutuhkan login menampilkan ajakan masuk sampai alur login mobile dari modul Profil tersedia.
+
+Contoh penggunaan dengan alamat PWS:
 
 ```text
-GET https://elvis-sestomi-ui-kembali.pws.cs.ui.ac.id/katalog/json/
-GET https://elvis-sestomi-ui-kembali.pws.cs.ui.ac.id/katalog/<id>/json/
+GET https://elvis-sestomi-ui-kembali.pws.cs.ui.ac.id/api/v1/items/?category=BUKU&type=ADOPSI
+GET https://elvis-sestomi-ui-kembali.pws.cs.ui.ac.id/api/v1/items/<uuid>/
 ```
-
-Endpoint di atas merupakan endpoint JSON yang terdokumentasi pada aplikasi web. Endpoint untuk operasi lain—seperti autentikasi mobile, pembuatan atau perubahan barang, permintaan transaksi, chat, forum, review, dan report—perlu dipastikan kembali ketersediaan endpoint JSON, format request/response, serta mekanisme autentikasinya bersama pengembangan backend. README ini tidak mengasumsikan endpoint yang belum didokumentasikan.
 
 ### Integrasi autentikasi
 
