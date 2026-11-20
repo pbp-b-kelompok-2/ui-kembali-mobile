@@ -1,10 +1,11 @@
-import 'package:material_ui/material_ui.dart';
+﻿import 'package:material_ui/material_ui.dart';
 
 import '../models/catalog_filter.dart';
 import 'forum/forum_page.dart';
 import 'home_page.dart';
 import 'katalog/catalog_page.dart';
 import 'placeholder_page.dart';
+import 'profile/profile_page.dart';
 import 'transactions/transaction_history_page.dart';
 
 /// Bottom navigation: Beranda, Jelajahi, Transaksi, Forum, Profil.
@@ -18,6 +19,7 @@ class HomeShell extends StatefulWidget {
 class _HomeShellState extends State<HomeShell> {
   static const _beranda = 0;
   static const _jelajahi = 1;
+  static const _transaksi = 2;
 
   int _index = _beranda;
   CatalogFilter _request = const CatalogFilter();
@@ -47,7 +49,10 @@ class _HomeShellState extends State<HomeShell> {
           CatalogPage(request: _request, onBack: () => setState(() => _index = _beranda)),
           TransactionHistoryPage(onBack: () => setState(() => _index = _beranda)),
           const ForumPage(),
-          const PlaceholderPage(title: 'Profil', owner: 'Elvis Sestomi', icon: Icons.person_outline),
+          ProfilePage(
+            onBack: () => setState(() => _index = _beranda),
+            onTransactions: () => setState(() => _index = _transaksi),
+          ),
         ],
       ),
       bottomNavigationBar: NavigationBar(
