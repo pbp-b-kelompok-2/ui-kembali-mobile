@@ -4,7 +4,7 @@ UIKembali Mobile adalah aplikasi mobile berbasis **Flutter** yang menjadi pendam
 
 Aplikasi mobile dirancang untuk terintegrasi dengan web service Django dari proyek web UIKembali, sehingga data yang digunakan pada aplikasi mobile terhubung dengan data pada aplikasi web.
 
-> **Status (Checkpoint 1):** kerangka aplikasi Flutter dan navigasi 5 tab tersedia. Modul Chat dan Katalog sudah memakai endpoint Django REST Framework. Modul Forum mengikuti tiga layar desain mobile (daftar komunitas, detail diskusi, dan buat posting), dengan daftar/pencarian/detail/komentar terhubung ke API. Pembuatan posting memerlukan pengguna yang sudah terautentikasi di backend. Profil masih berupa placeholder. Tautan APK menyusul setelah Checkpoint 1.
+> **Status (Checkpoint 1):** kerangka aplikasi Flutter dan navigasi 5 tab tersedia. Modul Chat dan Katalog sudah memakai endpoint Django REST Framework. Modul Forum mengikuti tiga layar desain mobile (daftar komunitas, detail diskusi, dan buat posting), dengan daftar/pencarian/detail/komentar terhubung ke API. Pembuatan posting memerlukan pengguna yang sudah terautentikasi di backend. Profil sudah memiliki screen yang sudah mengikuti versi web, namun belum ada interaksi yang diimplementasikan. Tautan APK menyusul setelah Checkpoint 1.
 
 ## Menjalankan Aplikasi
 
@@ -22,7 +22,7 @@ Struktur kode utama:
 ```text
 lib/
 ├── main.dart, theme.dart, config.dart   # entry point, token desain (font Inter), alamat API
-├── screens/                             # home_page, katalog/, forum/, transactions/, chat/, home_shell (bottom nav)
+├── screens/                             # home_page, katalog/, forum/, transactions/, chat/, profile/, home_shell (bottom nav)
 ├── models/                              # Item, Transaction, Chat, CatalogFilter, ForumPost, ForumComment
 ├── services/                            # KatalogApi, ChatApi dan ForumApi (Django REST Framework)
 └── widgets/item_card.dart               # kartu barang yang dipakai ulang
