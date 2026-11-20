@@ -39,6 +39,44 @@ class ForumApi {
     return ForumPost.fromJson(data);
   }
 
+  Future<ForumPost> createPost({
+    required String title,
+    required String content,
+    required String category,
+  }) async {
+    try {
+      final response = await _client.post(
+        _uri('/api/forum/posts/'),
+        headers: const {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({
+          'title': title,
+          'content': content,
+          'category': category,
+        }),
+      );
+      if (response.statusCode == 401 || response.statusCode == 403) {
+        throw const ForumApiException(
+          'Silakan masuk terlebih dahulu untuk membuat postingan.',
+        );
+      }
+      if (response.statusCode != 201) {
+        throw ForumApiException('Postingan gagal dibuat (HTTP ${response.statusCode}).');
+      }
+      return ForumPost.fromJson(
+        jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>,
+      );
+    } on ForumApiException {
+      rethrow;
+    } on FormatException {
+      throw const ForumApiException('Respons server bukan JSON yang valid.');
+    } catch (_) {
+      throw const ForumApiException('Tidak bisa terhubung ke server Forum.');
+    }
+  }
+
   Future<List<ForumComment>> fetchComments(int postId) async {
     final data = await _get(
       _uri('/api/forum/comments/', {'post': '$postId'}),

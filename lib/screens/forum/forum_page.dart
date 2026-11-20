@@ -46,8 +46,16 @@ class _ForumPageState extends State<ForumPage> {
   }
 
   void _onSearchChanged(String value) {
+    setState(() {});
     _debounce?.cancel();
     _debounce = Timer(_forumSearchDebounce, () => _load(search: value));
+  }
+
+  Future<void> _openCreatePost() async {
+    final created = await Navigator.of(context).push<bool>(
+      MaterialPageRoute<bool>(builder: (_) => ForumCreatePage(api: _api)),
+    );
+    if (created == true && mounted) _load(search: '');
   }
 
   Future<void> _refresh() async {
@@ -64,7 +72,7 @@ class _ForumPageState extends State<ForumPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Forum'),
+        title: const Text('Forum Komunitas'),
         actions: [
           IconButton(
             tooltip: 'Muat ulang',
@@ -76,7 +84,37 @@ class _ForumPageState extends State<ForumPage> {
       body: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: AppColors.subtle,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(Icons.eco_outlined, color: AppColors.greenDark, size: 24),
+                  const SizedBox(height: 18),
+                  Text(
+                    'Berbagi, bertanya, dan tumbuh bersama',
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          color: AppColors.ink,
+                          fontWeight: FontWeight.w800,
+                        ),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Temukan inspirasi dan diskusikan gaya hidup berkelanjutan bersama komunitas UIKembali.',
+                    style: TextStyle(color: AppColors.inkSoft, height: 1.45),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
             child: TextField(
               controller: _searchController,
               onChanged: _onSearchChanged,
@@ -98,8 +136,27 @@ class _ForumPageState extends State<ForumPage> {
                 fillColor: AppColors.surface,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none,
+                  borderSide: const BorderSide(color: AppColors.line),
                 ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: AppColors.line),
+                ),
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+            child: SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                onPressed: _openCreatePost,
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.yellow,
+                  foregroundColor: AppColors.ink,
+                ),
+                icon: const Icon(Icons.add),
+                label: const Text('Buat postingan'),
               ),
             ),
           ),
@@ -139,9 +196,9 @@ class _ForumPageState extends State<ForumPage> {
                 return RefreshIndicator(
                   onRefresh: _refresh,
                   child: ListView.separated(
-                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 20),
+                    padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
                     itemCount: posts.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 12),
+                    separatorBuilder: (_, __) => const SizedBox(height: 16),
                     itemBuilder: (context, index) => _ForumPostCard(
                       post: posts[index],
                       onTap: () => Navigator.of(context).push<void>(
@@ -177,7 +234,7 @@ class _ForumPostCard extends StatelessWidget {
       margin: EdgeInsets.zero,
       color: AppColors.surface,
       elevation: 1,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,
@@ -259,6 +316,173 @@ class _ForumPostCard extends StatelessWidget {
   }
 }
 
+class ForumCreatePage extends StatefulWidget {
+  const ForumCreatePage({super.key, required this.api});
+
+  final ForumApi api;
+
+  @override
+  State<ForumCreatePage> createState() => _ForumCreatePageState();
+}
+
+class _ForumCreatePageState extends State<ForumCreatePage> {
+  final _formKey = GlobalKey<FormState>();
+  final _titleController = TextEditingController();
+  final _contentController = TextEditingController();
+  String _category = 'TANYA';
+  bool _submitting = false;
+  String? _error;
+
+  @override
+  void dispose() {
+    _titleController.dispose();
+    _contentController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    if (!_formKey.currentState!.validate()) return;
+    setState(() {
+      _submitting = true;
+      _error = null;
+    });
+    try {
+      await widget.api.createPost(
+        title: _titleController.text.trim(),
+        content: _contentController.text.trim(),
+        category: _category,
+      );
+      if (mounted) Navigator.of(context).pop(true);
+    } on ForumApiException catch (error) {
+      if (mounted) setState(() => _error = error.message);
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Buat posting')),
+      body: Form(
+        key: _formKey,
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
+          children: [
+            Text(
+              'Mulai percakapan baru',
+              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                    color: AppColors.ink,
+                    fontWeight: FontWeight.w800,
+                  ),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Bagikan pertanyaan, tips, atau pengalamanmu dengan komunitas.',
+              style: TextStyle(color: AppColors.inkSoft, height: 1.45),
+            ),
+            const SizedBox(height: 28),
+            const _ForumFieldLabel('Kategori'),
+            const SizedBox(height: 8),
+            DropdownButtonFormField<String>(
+              value: _category,
+              decoration: _forumInputDecoration('Pilih kategori'),
+              items: forumCategoryLabels.entries
+                  .map((entry) => DropdownMenuItem(
+                        value: entry.key,
+                        child: Text(entry.value),
+                      ))
+                  .toList(),
+              onChanged: (value) {
+                if (value != null) setState(() => _category = value);
+              },
+            ),
+            const SizedBox(height: 22),
+            const _ForumFieldLabel('Judul postingan'),
+            const SizedBox(height: 8),
+            TextFormField(
+              controller: _titleController,
+              maxLength: 200,
+              textCapitalization: TextCapitalization.sentences,
+              decoration: _forumInputDecoration('Tulis judul yang jelas'),
+              validator: (value) => value == null || value.trim().isEmpty
+                  ? 'Judul wajib diisi.'
+                  : null,
+            ),
+            const SizedBox(height: 12),
+            const _ForumFieldLabel('Isi diskusi'),
+            const SizedBox(height: 8),
+            TextFormField(
+              controller: _contentController,
+              minLines: 7,
+              maxLines: 10,
+              textCapitalization: TextCapitalization.sentences,
+              decoration: _forumInputDecoration('Ceritakan hal yang ingin kamu diskusikan'),
+              validator: (value) => value == null || value.trim().isEmpty
+                  ? 'Isi diskusi wajib diisi.'
+                  : null,
+            ),
+            if (_error != null) ...[
+              const SizedBox(height: 12),
+              Text(_error!, style: const TextStyle(color: Colors.red)),
+            ],
+            const SizedBox(height: 24),
+            FilledButton(
+              onPressed: _submitting ? null : _submit,
+              style: FilledButton.styleFrom(
+                backgroundColor: AppColors.yellow,
+                foregroundColor: AppColors.ink,
+              ),
+              child: _submitting
+                  ? const SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Text('Publikasikan postingan'),
+            ),
+            const SizedBox(height: 12),
+            OutlinedButton(
+              onPressed: _submitting ? null : () => Navigator.of(context).pop(),
+              child: const Text('Batal'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ForumFieldLabel extends StatelessWidget {
+  const _ForumFieldLabel(this.label);
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) => Text(
+        label,
+        style: const TextStyle(
+          color: AppColors.ink,
+          fontWeight: FontWeight.w700,
+        ),
+      );
+}
+
+InputDecoration _forumInputDecoration(String hint) => InputDecoration(
+      hintText: hint,
+      filled: true,
+      fillColor: AppColors.surface,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10),
+        borderSide: const BorderSide(color: AppColors.line),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10),
+        borderSide: const BorderSide(color: AppColors.line),
+      ),
+    );
+
 class ForumDetailPage extends StatefulWidget {
   const ForumDetailPage({super.key, required this.api, required this.post});
 
@@ -302,43 +526,56 @@ class _ForumDetailPageState extends State<ForumDetailPage> {
           return ListView(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
             children: [
-          Card(
-            margin: EdgeInsets.zero,
-            color: AppColors.surface,
-            child: Padding(
-              padding: const EdgeInsets.all(18),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Chip(label: Text(forumCategoryLabels[post.category] ?? 'Lainnya')),
-                      const Spacer(),
-                      if (post.createdAt != null)
-                        Text(
-                          _shortDate(post.createdAt!),
-                          style: const TextStyle(color: AppColors.muted, fontSize: 12),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    post.title,
-                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                          color: AppColors.ink,
-                          fontWeight: FontWeight.w800,
-                        ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text('oleh ${post.author}', style: const TextStyle(color: AppColors.inkSoft)),
-                ],
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: AppColors.greenTint,
+              borderRadius: BorderRadius.circular(24),
+            ),
+            child: Text(
+              forumCategoryLabels[post.category] ?? 'Lainnya',
+              style: const TextStyle(
+                color: AppColors.greenDark,
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
               ),
             ),
+          ),
+          const SizedBox(height: 18),
+          Text(
+            post.title,
+            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  color: AppColors.ink,
+                  fontWeight: FontWeight.w800,
+                ),
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              CircleAvatar(
+                radius: 18,
+                backgroundColor: AppColors.greenTint,
+                child: Text(
+                  post.author.isEmpty ? '?' : post.author[0].toUpperCase(),
+                  style: const TextStyle(color: AppColors.greenDark, fontWeight: FontWeight.w700),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(post.author, style: const TextStyle(fontWeight: FontWeight.w700)),
+              ),
+              if (post.createdAt != null)
+                Text(
+                  _shortDate(post.createdAt!),
+                  style: const TextStyle(color: AppColors.muted, fontSize: 12),
+                ),
+            ],
           ),
           const SizedBox(height: 20),
           Card(
             margin: EdgeInsets.zero,
             color: AppColors.surface,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
             child: Padding(
               padding: const EdgeInsets.all(18),
               child: Text(post.content, style: const TextStyle(color: AppColors.ink, height: 1.5)),

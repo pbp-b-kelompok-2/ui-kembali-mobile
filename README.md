@@ -4,7 +4,7 @@ UIKembali Mobile adalah aplikasi mobile berbasis **Flutter** yang menjadi pendam
 
 Aplikasi mobile dirancang untuk terintegrasi dengan web service Django dari proyek web UIKembali, sehingga data yang digunakan pada aplikasi mobile terhubung dengan data pada aplikasi web.
 
-> **Status (Checkpoint 1):** kerangka aplikasi Flutter dan navigasi 5 tab tersedia. Modul Katalog sudah memakai endpoint Django REST Framework. Modul Forum memiliki halaman daftar diskusi, pencarian, detail diskusi, dan komentar; endpoint backend Forum perlu sudah digabung dan dipasang di server agar data tampil. Profil masih berupa placeholder. Tautan APK menyusul setelah Checkpoint 1.
+> **Status (Checkpoint 1):** kerangka aplikasi Flutter dan navigasi 5 tab tersedia. Modul Katalog sudah memakai endpoint Django REST Framework. Modul Forum mengikuti tiga layar desain mobile (daftar komunitas, detail diskusi, dan buat posting), dengan daftar/pencarian/detail/komentar terhubung ke API. Pembuatan posting memerlukan pengguna yang sudah terautentikasi di backend. Profil masih berupa placeholder. Tautan APK menyusul setelah Checkpoint 1.
 
 ## Menjalankan Aplikasi
 
