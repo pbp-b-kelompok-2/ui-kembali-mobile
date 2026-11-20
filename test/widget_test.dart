@@ -170,7 +170,10 @@ void main() {
       await tester.tap(find.text('Buku Kalkulus'));
       await tester.pumpAndSettle();
       expect(find.text('Detail barang'), findsOneWidget);
-      expect(find.text('Masuk untuk melihat kontak'), findsOneWidget);
+      expect(find.text('Kontak · Masuk untuk melihat kontak'), findsOneWidget);
+      expect(find.text('Lokasi temu · Kampus UI'), findsOneWidget);
+      expect(find.text('Ajukan pembelian'), findsOneWidget);
+      expect(find.text('Chat pemilik'), findsOneWidget);
     });
   });
 

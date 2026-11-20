@@ -13,6 +13,8 @@ class AppColors {
   static const greenTint = Color(0xFFDFF1E5);
   static const subtle = Color(0xFFEDF6EF);
   static const yellow = Color(0xFFFFCB05);
+  static const info = Color(0xFF2769A8);
+  static const infoTint = Color(0xFFE7F1FA);
 }
 
 ThemeData buildAppTheme() {
