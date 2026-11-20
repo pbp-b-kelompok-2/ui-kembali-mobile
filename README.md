@@ -4,7 +4,7 @@ UIKembali Mobile adalah aplikasi mobile berbasis **Flutter** yang menjadi pendam
 
 Aplikasi mobile dirancang untuk terintegrasi dengan web service Django dari proyek web UIKembali, sehingga data yang digunakan pada aplikasi mobile terhubung dengan data pada aplikasi web.
 
-> **Status (Checkpoint 1):** kerangka aplikasi Flutter, navigasi 5 tab, dan modul **Katalog** (Beranda, Jelajahi & filter, detail barang, Riwayat transaksi) sudah terhubung ke endpoint Django REST Framework. Tab Forum dan Profil masih berupa halaman placeholder milik anggota lain. Tautan APK menyusul setelah Checkpoint 1.
+> **Status (Checkpoint 1):** kerangka aplikasi Flutter dan navigasi 5 tab tersedia. Modul Katalog sudah memakai endpoint Django REST Framework. Modul Forum mengikuti tiga layar desain mobile (daftar komunitas, detail diskusi, dan buat posting), dengan daftar/pencarian/detail/komentar terhubung ke API. Pembuatan posting memerlukan pengguna yang sudah terautentikasi di backend. Profil masih berupa placeholder. Tautan APK menyusul setelah Checkpoint 1.
 
 ## Menjalankan Aplikasi
 
@@ -22,9 +22,9 @@ Struktur kode utama:
 ```text
 lib/
 ├── main.dart, theme.dart, config.dart   # entry point, token desain (font Inter), alamat API
-├── models/                              # Item, Transaction, CatalogFilter
-├── services/katalog_api.dart            # pemanggilan HTTP ke Django REST Framework
-├── screens/                             # home_page, katalog/, transactions/, home_shell (bottom nav)
+├── screens/                             # home_page, katalog/, forum/, transactions/, home_shell (bottom nav)
+├── models/                              # Item, Transaction, CatalogFilter, ForumPost, ForumComment
+├── services/                            # KatalogApi dan ForumApi (Django REST Framework)
 └── widgets/item_card.dart               # kartu barang yang dipakai ulang
 ```
 
@@ -126,6 +126,22 @@ Endpoint berikut dibangun dengan Django REST Framework pada repository web UIKem
 | `PUT`/`PATCH`/`DELETE` | `/api/v1/items/<uuid>/` | Ubah / hapus (soft delete) barang. | Pemilik barang |
 | `POST` | `/api/v1/items/<uuid>/ajukan/` | Mengajukan adopsi/pembelian. | Pengguna login, bukan pemilik |
 | `GET` | `/api/v1/transactions/` | Riwayat transaksi (sebagai peminta atau pemilik). Filter: `type`, `page`. | Pengguna login |
+
+### Endpoint Django REST Framework (modul Forum)
+
+API Forum berada pada prefix `/api/forum/`. Operasi baca bersifat publik; operasi tulis memerlukan autentikasi session Django. Backend Forum tersedia pada source web branch `feat/dimas`; API perlu digabung dan dipasang di server sebelum dipakai aplikasi mobile.
+
+| Method | Endpoint | Kegunaan | Akses |
+|---|---|---|---|
+| `GET` | `/api/forum/posts/` | Daftar diskusi; menerima parameter pencarian `search`. | Publik |
+| `GET` | `/api/forum/posts/<id>/` | Detail diskusi. | Publik |
+| `POST` | `/api/forum/posts/` | Membuat diskusi. | Login |
+| `PATCH`, `DELETE` | `/api/forum/posts/<id>/` | Mengubah atau menghapus diskusi sendiri. | Login, pemilik |
+| `POST` | `/api/forum/posts/<id>/like/` | Toggle like diskusi. | Login |
+| `POST` | `/api/forum/posts/<id>/save/` | Toggle simpan diskusi. | Login |
+| `GET` | `/api/forum/comments/?post=<id>` | Daftar komentar/balasan untuk diskusi. | Publik |
+| `POST` | `/api/forum/comments/` | Membuat komentar/balasan (`post`, `content`, opsional `parent`). | Login |
+| `PATCH`, `DELETE` | `/api/forum/comments/<id>/` | Mengubah atau menghapus komentar sendiri. | Login, penulis |
 
 Pengunjung yang belum login tidak menerima field `contact`, dan koordinat dibulatkan sekitar 100 m. Autentikasi memakai session Django (`SessionAuthentication`); halaman yang membutuhkan login menampilkan ajakan masuk sampai alur login mobile dari modul Profil tersedia.
 
