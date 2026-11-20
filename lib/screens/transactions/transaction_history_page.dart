@@ -1,15 +1,20 @@
 import 'package:material_ui/material_ui.dart';
 
+import '../../models/chat.dart';
 import '../../models/transaction.dart';
+import '../../services/chat_api.dart';
 import '../../services/katalog_api.dart';
 import '../../theme.dart';
+import '../chat/chat_conversation_page.dart';
+import '../chat/chat_inbox_page.dart';
 import '../katalog/item_detail_page.dart';
 
 /// "Riwayat transaksi": every request the user made or received.
 class TransactionHistoryPage extends StatefulWidget {
-  const TransactionHistoryPage({super.key, this.api, this.onBack});
+  const TransactionHistoryPage({super.key, this.api, this.chatApi, this.onBack});
 
   final KatalogApi? api;
+  final ChatApi? chatApi;
   final VoidCallback? onBack;
 
   @override
@@ -20,6 +25,7 @@ class _TransactionHistoryPageState extends State<TransactionHistoryPage> {
   static const _filters = {'': 'Semua', 'JUAL': 'Pembelian', 'ADOPSI': 'Adopsi'};
 
   late final KatalogApi _api = widget.api ?? KatalogApi();
+  late final ChatApi _chatApi = widget.chatApi ?? ChatApi();
   final _scroll = ScrollController();
 
   String _type = '';
@@ -81,15 +87,54 @@ class _TransactionHistoryPageState extends State<TransactionHistoryPage> {
     _load(reset: true);
   }
 
-  void _openChat() {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(const SnackBar(content: Text('Chat transaksi segera hadir.')));
+  Future<void> _openChat(Transaction row) async {
+    try {
+      ChatConversation? conversation;
+      if (row.isRequester) {
+        conversation = await _chatApi.openConversation(row.item.id);
+      } else {
+        final conversations = await _chatApi.fetchConversations();
+        for (final entry in conversations) {
+          if (entry.itemId == row.item.id && entry.buyer == row.counterpart) {
+            conversation = entry;
+            break;
+          }
+        }
+      }
+      if (!mounted) return;
+      if (conversation == null) {
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(const SnackBar(content: Text('Percakapan untuk transaksi ini belum tersedia.')));
+        return;
+      }
+      final activeConversation = conversation;
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => ChatConversationPage(conversation: activeConversation, item: row.item, chatApi: _chatApi, katalogApi: _api),
+        ),
+      );
+    } on ApiException catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(content: Text(error.needsLogin ? 'Masuk dulu untuk membuka chat.' : error.message)));
+    }
+  }
+
+  void _openInbox() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => ChatInboxPage(api: _chatApi, katalogApi: _api),
+      ),
+    );
   }
 
   void _openDetail(Transaction row) {
     Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => ItemDetailPage(item: row.item, api: _api)),
+      MaterialPageRoute(
+        builder: (_) => ItemDetailPage(item: row.item, api: _api),
+      ),
     );
   }
 
@@ -98,10 +143,9 @@ class _TransactionHistoryPageState extends State<TransactionHistoryPage> {
     return Scaffold(
       appBar: AppBar(
         automaticallyImplyLeading: false,
-        leading: widget.onBack == null
-            ? null
-            : IconButton(icon: const Icon(Icons.chevron_left, size: 30), onPressed: widget.onBack),
+        leading: widget.onBack == null ? null : IconButton(icon: const Icon(Icons.chevron_left, size: 30), onPressed: widget.onBack),
         title: const Text('Riwayat transaksi', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18)),
+        actions: [IconButton(tooltip: 'Pesan', onPressed: _openInbox, icon: const Icon(Icons.chat_bubble_outline))],
       ),
       body: RefreshIndicator(
         onRefresh: () => _load(reset: true),
@@ -114,10 +158,7 @@ class _TransactionHistoryPageState extends State<TransactionHistoryPage> {
               style: TextStyle(fontSize: 26, fontWeight: FontWeight.w800, color: AppColors.ink),
             ),
             const SizedBox(height: 6),
-            const Text(
-              'Setiap transaksi menjaga manfaat tetap berputar.',
-              style: TextStyle(color: AppColors.inkSoft, fontSize: 14),
-            ),
+            const Text('Setiap transaksi menjaga manfaat tetap berputar.', style: TextStyle(color: AppColors.inkSoft, fontSize: 14)),
             const SizedBox(height: 12),
             Row(
               children: [
@@ -130,13 +171,7 @@ class _TransactionHistoryPageState extends State<TransactionHistoryPage> {
                         padding: const EdgeInsets.symmetric(vertical: 6),
                         child: Text(
                           entry.value,
-                          style: TextStyle(
-                            color: AppColors.green,
-                            fontWeight: FontWeight.w800,
-                            decoration: entry.key == _type ? TextDecoration.underline : null,
-                            decorationColor: AppColors.green,
-                            decorationThickness: 2,
-                          ),
+                          style: TextStyle(color: AppColors.green, fontWeight: FontWeight.w800, decoration: entry.key == _type ? TextDecoration.underline : null, decorationColor: AppColors.green, decorationThickness: 2),
                         ),
                       ),
                     ),
@@ -153,33 +188,40 @@ class _TransactionHistoryPageState extends State<TransactionHistoryPage> {
 
   List<Widget> _content() {
     if (_rows.isEmpty && _loading) {
-      return const [Padding(padding: EdgeInsets.all(32), child: Center(child: CircularProgressIndicator()))];
+      return const [
+        Padding(
+          padding: EdgeInsets.all(32),
+          child: Center(child: CircularProgressIndicator()),
+        ),
+      ];
     }
     if (_rows.isEmpty && _error != null) {
       return [
         Padding(
           padding: const EdgeInsets.all(24),
-          child: Center(
-            child: Text(
-              _error!.needsLogin ? 'Masuk dulu untuk melihat riwayat transaksimu.' : _error!.message,
-              textAlign: TextAlign.center,
-            ),
-          ),
+          child: Center(child: Text(_error!.needsLogin ? 'Masuk dulu untuk melihat riwayat transaksimu.' : _error!.message, textAlign: TextAlign.center)),
         ),
         if (!_error!.needsLogin)
-          Center(child: TextButton(onPressed: () => _load(reset: true), child: const Text('Coba lagi'))),
+          Center(
+            child: TextButton(onPressed: () => _load(reset: true), child: const Text('Coba lagi')),
+          ),
       ];
     }
     if (_rows.isEmpty) {
-      return const [Padding(padding: EdgeInsets.all(32), child: Center(child: Text('Belum ada transaksi.')))];
+      return const [
+        Padding(
+          padding: EdgeInsets.all(32),
+          child: Center(child: Text('Belum ada transaksi.')),
+        ),
+      ];
     }
     return [
-      for (final row in _rows)
-        _TransactionCard(
-          row: row,
-          onAction: () => row.isOpen ? _openChat() : _openDetail(row),
+      for (final row in _rows) _TransactionCard(row: row, onAction: () => row.isOpen ? _openChat(row) : _openDetail(row)),
+      if (_loading)
+        const Padding(
+          padding: EdgeInsets.all(16),
+          child: Center(child: CircularProgressIndicator()),
         ),
-      if (_loading) const Padding(padding: EdgeInsets.all(16), child: Center(child: CircularProgressIndicator())),
     ];
   }
 }
@@ -204,7 +246,10 @@ class _TransactionCard extends StatelessWidget {
           children: [
             ClipRRect(
               borderRadius: BorderRadius.circular(10),
-              child: AspectRatio(aspectRatio: 16 / 7, child: _Photo(url: row.item.photoUrl)),
+              child: AspectRatio(
+                aspectRatio: 16 / 7,
+                child: _Photo(url: row.item.photoUrl),
+              ),
             ),
             const SizedBox(height: 12),
             _StatusPill(status: row.status, label: row.statusLabel),
@@ -218,10 +263,7 @@ class _TransactionCard extends StatelessWidget {
             const SizedBox(height: 12),
             SizedBox(
               width: double.infinity,
-              child: OutlinedButton(
-                onPressed: onAction,
-                child: Text(row.isOpen ? 'Buka chat transaksi' : 'Lihat detail transaksi'),
-              ),
+              child: OutlinedButton(onPressed: onAction, child: Text(row.isOpen ? 'Buka chat transaksi' : 'Lihat detail transaksi')),
             ),
           ],
         ),
@@ -262,7 +304,10 @@ class _StatusPill extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
       decoration: BoxDecoration(color: background, borderRadius: BorderRadius.circular(20)),
-      child: Text(label, style: TextStyle(color: foreground, fontSize: 12, fontWeight: FontWeight.w700)),
+      child: Text(
+        label,
+        style: TextStyle(color: foreground, fontSize: 12, fontWeight: FontWeight.w700),
+      ),
     );
   }
 }

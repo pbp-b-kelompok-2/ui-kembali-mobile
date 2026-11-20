@@ -1,6 +1,7 @@
 ﻿import 'package:material_ui/material_ui.dart';
 
 import '../models/catalog_filter.dart';
+import 'forum/forum_page.dart';
 import 'home_page.dart';
 import 'katalog/catalog_page.dart';
 import 'placeholder_page.dart';
@@ -47,7 +48,7 @@ class _HomeShellState extends State<HomeShell> {
           HomePage(onExplore: _explore),
           CatalogPage(request: _request, onBack: () => setState(() => _index = _beranda)),
           TransactionHistoryPage(onBack: () => setState(() => _index = _beranda)),
-          const PlaceholderPage(title: 'Forum', owner: 'Dimas Bayu Nugroho', icon: Icons.forum_outlined),
+          const ForumPage(),
           ProfilePage(
             onBack: () => setState(() => _index = _beranda),
             onTransactions: () => setState(() => _index = _transaksi),
