@@ -4,6 +4,7 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../models/catalog_filter.dart';
 import '../../models/item.dart';
+import '../../services/chat_api.dart';
 import '../../services/katalog_api.dart';
 import '../../theme.dart';
 import '../../widgets/item_card.dart';
@@ -13,9 +14,10 @@ const _searchDebounce = Duration(milliseconds: 400);
 
 /// "Jelajahi & filter": search, Semua/Gratis/Dijual chips, filter panel, results.
 class CatalogPage extends StatefulWidget {
-  const CatalogPage({super.key, this.api, this.request, this.onBack});
+  const CatalogPage({super.key, this.api, this.chatApi, this.request, this.onBack});
 
   final KatalogApi? api;
+  final ChatApi? chatApi;
 
   /// A filter sent from another tab; applied whenever its `id` changes.
   final CatalogFilter? request;
@@ -120,17 +122,14 @@ class _CatalogPageState extends State<CatalogPage> {
 
   void _applyPanel() {
     FocusScope.of(context).unfocus();
-    _apply(_filter.copyWith(
-      category: _draft.category,
-      condition: _draft.condition,
-      sort: _draft.sort,
-      location: _locationController.text.trim(),
-    ));
+    _apply(_filter.copyWith(category: _draft.category, condition: _draft.condition, sort: _draft.sort, location: _locationController.text.trim()));
   }
 
   void _openItem(Item item) {
     Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => ItemDetailPage(item: item, api: _api)),
+      MaterialPageRoute(
+        builder: (_) => ItemDetailPage(item: item, api: _api, chatApi: widget.chatApi),
+      ),
     );
   }
 
@@ -139,9 +138,7 @@ class _CatalogPageState extends State<CatalogPage> {
     return Scaffold(
       appBar: AppBar(
         automaticallyImplyLeading: false,
-        leading: widget.onBack == null
-            ? null
-            : IconButton(icon: const Icon(Icons.chevron_left, size: 30), onPressed: widget.onBack),
+        leading: widget.onBack == null ? null : IconButton(icon: const Icon(Icons.chevron_left, size: 30), onPressed: widget.onBack),
         title: const Text('Jelajahi', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 22)),
       ),
       body: RefreshIndicator(
@@ -163,16 +160,17 @@ class _CatalogPageState extends State<CatalogPage> {
               ),
             ),
             const SizedBox(height: 12),
-            _TypeChips(selected: _filter.type, onSelected: (type) => _apply(_filter.copyWith(type: type))),
-            const SizedBox(height: 16),
-            _FilterPanel(
-              draft: _draft,
-              locationController: _locationController,
-              onChanged: (draft) => setState(() => _draft = draft),
-              onApply: _applyPanel,
+            _TypeChips(
+              selected: _filter.type,
+              onSelected: (type) => _apply(_filter.copyWith(type: type)),
             ),
+            const SizedBox(height: 16),
+            _FilterPanel(draft: _draft, locationController: _locationController, onChanged: (draft) => setState(() => _draft = draft), onApply: _applyPanel),
             const SizedBox(height: 20),
-            const Text('Hasil pencarian', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: AppColors.ink)),
+            const Text(
+              'Hasil pencarian',
+              style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: AppColors.ink),
+            ),
             const SizedBox(height: 12),
             ..._results(),
           ],
@@ -183,20 +181,36 @@ class _CatalogPageState extends State<CatalogPage> {
 
   List<Widget> _results() {
     if (_items.isEmpty && _loading) {
-      return const [Padding(padding: EdgeInsets.all(32), child: Center(child: CircularProgressIndicator()))];
+      return const [
+        Padding(
+          padding: EdgeInsets.all(32),
+          child: Center(child: CircularProgressIndicator()),
+        ),
+      ];
     }
     if (_items.isEmpty && _error != null) {
       return [
         Center(child: Text(_error!)),
-        Center(child: TextButton(onPressed: () => _load(reset: true), child: const Text('Coba lagi'))),
+        Center(
+          child: TextButton(onPressed: () => _load(reset: true), child: const Text('Coba lagi')),
+        ),
       ];
     }
     if (_items.isEmpty) {
-      return const [Padding(padding: EdgeInsets.all(32), child: Center(child: Text('Belum ada barang yang cocok.')))];
+      return const [
+        Padding(
+          padding: EdgeInsets.all(32),
+          child: Center(child: Text('Belum ada barang yang cocok.')),
+        ),
+      ];
     }
     return [
       for (final item in _items) ItemCard(item: item, onTap: () => _openItem(item)),
-      if (_loading) const Padding(padding: EdgeInsets.all(16), child: Center(child: CircularProgressIndicator())),
+      if (_loading)
+        const Padding(
+          padding: EdgeInsets.all(16),
+          child: Center(child: CircularProgressIndicator()),
+        ),
       if (_error != null) TextButton(onPressed: _load, child: Text('$_error Ketuk untuk mencoba lagi.')),
     ];
   }
@@ -225,10 +239,7 @@ class _TypeChips extends StatelessWidget {
             selectedColor: AppColors.green,
             side: BorderSide.none,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-            labelStyle: TextStyle(
-              fontWeight: FontWeight.w800,
-              color: selected == entry.key ? Colors.white : AppColors.ink,
-            ),
+            labelStyle: TextStyle(fontWeight: FontWeight.w800, color: selected == entry.key ? Colors.white : AppColors.ink),
           ),
       ],
     );
@@ -236,12 +247,7 @@ class _TypeChips extends StatelessWidget {
 }
 
 class _FilterPanel extends StatelessWidget {
-  const _FilterPanel({
-    required this.draft,
-    required this.locationController,
-    required this.onChanged,
-    required this.onApply,
-  });
+  const _FilterPanel({required this.draft, required this.locationController, required this.onChanged, required this.onApply});
 
   final CatalogFilter draft;
   final TextEditingController locationController;
@@ -256,7 +262,10 @@ class _FilterPanel extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Filter pencarian', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.ink)),
+          const Text(
+            'Filter pencarian',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.ink),
+          ),
           const SizedBox(height: 12),
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -324,21 +333,16 @@ class _FilterPanel extends StatelessWidget {
 }
 
 InputDecoration _fieldDecoration(String label, {String? hint}) => InputDecoration(
-      labelText: label,
-      hintText: hint,
-      isDense: true,
-      filled: true,
-      fillColor: AppColors.surface,
-      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
-    );
+  labelText: label,
+  hintText: hint,
+  isDense: true,
+  filled: true,
+  fillColor: AppColors.surface,
+  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+);
 
 class _Dropdown extends StatelessWidget {
-  const _Dropdown({
-    required this.label,
-    required this.value,
-    required this.options,
-    required this.onChanged,
-  });
+  const _Dropdown({required this.label, required this.value, required this.options, required this.onChanged});
 
   final String label;
   final String value;
@@ -356,7 +360,10 @@ class _Dropdown extends StatelessWidget {
           isExpanded: true,
           items: [
             for (final entry in options.entries)
-              DropdownMenuItem(value: entry.key, child: Text(entry.value, overflow: TextOverflow.ellipsis)),
+              DropdownMenuItem(
+                value: entry.key,
+                child: Text(entry.value, overflow: TextOverflow.ellipsis),
+              ),
           ],
           onChanged: (v) => onChanged(v ?? ''),
         ),

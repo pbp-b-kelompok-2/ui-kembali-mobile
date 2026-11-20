@@ -1,15 +1,18 @@
 import 'package:material_ui/material_ui.dart';
 
 import '../../models/item.dart';
+import '../chat/chat_conversation_page.dart';
+import '../../services/chat_api.dart';
 import '../../services/katalog_api.dart';
 import '../../theme.dart';
 
 /// Detail of one barang, loaded from `GET /api/v1/items/<id>/`.
 class ItemDetailPage extends StatefulWidget {
-  const ItemDetailPage({super.key, required this.item, this.api});
+  const ItemDetailPage({super.key, required this.item, this.api, this.chatApi});
 
   final Item item;
   final KatalogApi? api;
+  final ChatApi? chatApi;
 
   @override
   State<ItemDetailPage> createState() => _ItemDetailPageState();
@@ -17,19 +20,34 @@ class ItemDetailPage extends StatefulWidget {
 
 class _ItemDetailPageState extends State<ItemDetailPage> {
   late final KatalogApi _api = widget.api ?? KatalogApi();
+  late final ChatApi _chatApi = widget.chatApi ?? ChatApi();
   late Future<Item> _future = _api.fetchItem(widget.item.id);
 
   void _retry() => setState(() => _future = _api.fetchItem(widget.item.id));
+
+  Future<void> _openChat(Item item) async {
+    try {
+      final conversation = await _chatApi.openConversation(item.id);
+      if (!mounted) return;
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => ChatConversationPage(conversation: conversation, item: item, chatApi: _chatApi, katalogApi: _api),
+        ),
+      );
+    } on ApiException catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(content: Text(error.needsLogin ? 'Masuk dulu untuk memulai chat.' : error.message)));
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         automaticallyImplyLeading: false,
-        leading: IconButton(
-          icon: const Icon(Icons.chevron_left, size: 30),
-          onPressed: () => Navigator.of(context).maybePop(),
-        ),
+        leading: IconButton(icon: const Icon(Icons.chevron_left, size: 30), onPressed: () => Navigator.of(context).maybePop()),
         title: const Text('Detail barang', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 22)),
       ),
       body: FutureBuilder<Item>(
@@ -50,7 +68,7 @@ class _ItemDetailPageState extends State<ItemDetailPage> {
           if (!snapshot.hasData) {
             return const Center(child: CircularProgressIndicator());
           }
-          return _ItemDetail(item: snapshot.data!);
+          return _ItemDetail(item: snapshot.data!, onChat: () => _openChat(snapshot.data!));
         },
       ),
     );
@@ -58,9 +76,10 @@ class _ItemDetailPageState extends State<ItemDetailPage> {
 }
 
 class _ItemDetail extends StatelessWidget {
-  const _ItemDetail({required this.item});
+  const _ItemDetail({required this.item, required this.onChat});
 
   final Item item;
+  final VoidCallback onChat;
 
   // Requests and chat belong to other modules; keep the buttons visible like the design.
   void _comingSoon(BuildContext context, String message) {
@@ -77,22 +96,19 @@ class _ItemDetail extends StatelessWidget {
       children: [
         ClipRRect(
           borderRadius: BorderRadius.circular(16),
-          child: AspectRatio(aspectRatio: 3 / 2, child: _Photo(url: item.photoUrl)),
+          child: AspectRatio(
+            aspectRatio: 3 / 2,
+            child: _Photo(url: item.photoUrl),
+          ),
         ),
         const SizedBox(height: 14),
         Wrap(
           spacing: 8,
           runSpacing: 8,
           children: [
-            _Pill(
-              label: item.isFree ? 'Gratis' : 'Dijual',
-              background: item.isFree ? AppColors.greenTint : AppColors.yellow,
-              foreground: item.isFree ? AppColors.greenDark : AppColors.ink,
-            ),
-            if (item.conditionLabel.isNotEmpty)
-              _Pill(label: item.conditionLabel, background: AppColors.infoTint, foreground: AppColors.info),
-            if (!item.isAvailable)
-              _Pill(label: item.status == 'DIPESAN' ? 'Dipesan' : 'Selesai', background: AppColors.line, foreground: AppColors.inkSoft),
+            _Pill(label: item.isFree ? 'Gratis' : 'Dijual', background: item.isFree ? AppColors.greenTint : AppColors.yellow, foreground: item.isFree ? AppColors.greenDark : AppColors.ink),
+            if (item.conditionLabel.isNotEmpty) _Pill(label: item.conditionLabel, background: AppColors.infoTint, foreground: AppColors.info),
+            if (!item.isAvailable) _Pill(label: item.status == 'DIPESAN' ? 'Dipesan' : 'Selesai', background: AppColors.line, foreground: AppColors.inkSoft),
           ],
         ),
         const SizedBox(height: 16),
@@ -109,7 +125,10 @@ class _ItemDetail extends StatelessWidget {
         Text(item.categoryLabel, style: const TextStyle(fontSize: 12, color: AppColors.muted)),
         if (item.description.isNotEmpty) ...[
           const SizedBox(height: 20),
-          const Text('Tentang barang', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: AppColors.ink)),
+          const Text(
+            'Tentang barang',
+            style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: AppColors.ink),
+          ),
           const SizedBox(height: 10),
           Text(item.description, style: const TextStyle(fontSize: 16, height: 1.5, color: AppColors.inkSoft)),
         ],
@@ -124,10 +143,7 @@ class _ItemDetail extends StatelessWidget {
         const SizedBox(height: 14),
         _OwnerCard(name: item.owner),
         const SizedBox(height: 14),
-        const Text(
-          'Utamakan titik temu publik di kampus dan konfirmasi kondisi barang melalui chat.',
-          style: TextStyle(fontSize: 14, height: 1.4, color: AppColors.inkSoft),
-        ),
+        const Text('Utamakan titik temu publik di kampus dan konfirmasi kondisi barang melalui chat.', style: TextStyle(fontSize: 14, height: 1.4, color: AppColors.inkSoft)),
         const SizedBox(height: 16),
         if (canRequest) ...[
           FilledButton(
@@ -140,16 +156,13 @@ class _ItemDetail extends StatelessWidget {
               textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
             ),
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: Text(item.isFree ? 'Ajukan adopsi' : 'Ajukan pembelian'),
-            ),
+            child: Align(alignment: Alignment.centerLeft, child: Text(item.isFree ? 'Ajukan adopsi' : 'Ajukan pembelian')),
           ),
           const SizedBox(height: 12),
         ],
         if (!item.isOwner)
           OutlinedButton(
-            onPressed: () => _comingSoon(context, 'Chat segera hadir.'),
+            onPressed: onChat,
             style: OutlinedButton.styleFrom(
               backgroundColor: AppColors.surface,
               minimumSize: const Size.fromHeight(46),
@@ -190,7 +203,10 @@ class _Pill extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
       decoration: BoxDecoration(color: background, borderRadius: BorderRadius.circular(20)),
-      child: Text(label, style: TextStyle(color: foreground, fontSize: 12, fontWeight: FontWeight.w700)),
+      child: Text(
+        label,
+        style: TextStyle(color: foreground, fontSize: 12, fontWeight: FontWeight.w700),
+      ),
     );
   }
 }
@@ -209,10 +225,7 @@ class _InfoCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          for (var i = 0; i < lines.length; i++) ...[
-            if (i > 0) const SizedBox(height: 14),
-            Text(lines[i], style: const TextStyle(fontSize: 14, color: AppColors.ink)),
-          ],
+          for (var i = 0; i < lines.length; i++) ...[if (i > 0) const SizedBox(height: 14), Text(lines[i], style: const TextStyle(fontSize: 14, color: AppColors.ink))],
         ],
       ),
     );
@@ -233,7 +246,10 @@ class _OwnerCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(name, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: AppColors.ink)),
+          Text(
+            name,
+            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: AppColors.ink),
+          ),
           const SizedBox(height: 8),
           const Text('Pemilik barang', style: TextStyle(fontSize: 14, color: AppColors.inkSoft)),
         ],
